@@ -188,6 +188,9 @@ public class WALEdit implements HeapSize {
    * @return All families in {@link #getCells()}; may be null.
    */
   public Set<byte []> getFamilies() {
+    // PHOENIX creates METAFAMILY WAL entries. These must be filtered
+    // This seems to be least costly way to do that
+    this.families.remove(METAFAMILY);
     return this.families;
   }
 
