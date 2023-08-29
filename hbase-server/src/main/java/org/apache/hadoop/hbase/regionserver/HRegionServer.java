@@ -118,7 +118,6 @@ import org.apache.hadoop.hbase.io.hfile.BlockCache;
 import org.apache.hadoop.hbase.io.hfile.BlockCacheFactory;
 import org.apache.hadoop.hbase.io.hfile.CombinedBlockCache;
 import org.apache.hadoop.hbase.io.hfile.HFile;
-import org.apache.hadoop.hbase.io.hfile.PrefetchExecutor;
 import org.apache.hadoop.hbase.io.hfile.bucket.BucketCache;
 import org.apache.hadoop.hbase.io.util.MemorySizeUtil;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcUtils;
@@ -255,8 +254,8 @@ public class HRegionServer extends Thread
   implements RegionServerServices, LastSequenceId, ConfigurationObserver {
   private static final Logger LOG = LoggerFactory.getLogger(HRegionServer.class);
 
-  private static final int unitMB = 1024 * 1024;
-  private static final int unitKB = 1024;
+  int unitMB = 1024 * 1024;
+  int unitKB = 1024;
 
   /**
    * For testing only! Set to true to skip notifying region assignment to master .
@@ -1420,7 +1419,7 @@ public class HRegionServer extends Thread
     }
     computeIfPersistentBucketCache(bc -> {
       bc.getRegionCachedInfo().forEach((regionName, prefetchSize) -> {
-        serverLoad.putRegionPrefetchInfo(regionName, roundSize(prefetchSize, unitMB));
+        serverLoad.putRegionCachedInfo(regionName, roundSize(prefetchSize, unitMB));
       });
     });
     serverLoad.setReportStartTime(reportStartTime);
@@ -1736,7 +1735,6 @@ public class HRegionServer extends Thread
     }
   }
 
-
   /**
    * @param r               Region to get RegionLoad for.
    * @param regionLoadBldr  the RegionLoad.Builder, can be null
@@ -1760,7 +1758,6 @@ public class HRegionServer extends Thread
     long totalCompactingKVs = 0L;
     long currentCompactedKVs = 0L;
     long totalRegionSize = 0L;
-
     List<HStore> storeList = r.getStores();
     stores += storeList.size();
     for (HStore store : storeList) {
@@ -1793,12 +1790,13 @@ public class HRegionServer extends Thread
     int totalStaticIndexSizeKB = roundSize(totalStaticIndexSize, unitKB);
     int totalStaticBloomSizeKB = roundSize(totalStaticBloomSize, unitKB);
     int regionSizeMB = roundSize(totalRegionSize, unitMB);
-    final MutableFloat currentRegionPrefetchRatio = new MutableFloat(0.0f);
-    computeIfPersistentBucketCache( bc -> {
+    final MutableFloat currentRegionCachedRatio = new MutableFloat(0.0f);
+    computeIfPersistentBucketCache(bc -> {
       if (bc.getRegionCachedInfo().containsKey(regionEncodedName)) {
-        currentRegionPrefetchRatio.setValue(regionSizeMB == 0 ? 0.0f :
-          (float) roundSize(bc.getRegionCachedInfo().
-            get(regionEncodedName), unitMB) / regionSizeMB);
+        currentRegionCachedRatio.setValue(regionSizeMB == 0
+          ? 0.0f
+          : (float) roundSize(bc.getRegionCachedInfo().get(regionEncodedName), unitMB)
+            / regionSizeMB);
       }
     });
 
@@ -1831,8 +1829,8 @@ public class HRegionServer extends Thread
       .setDataLocalityForSsd(dataLocalityForSsd).setBlocksLocalWeight(blocksLocalWeight)
       .setBlocksLocalWithSsdWeight(blocksLocalWithSsdWeight).setBlocksTotalWeight(blocksTotalWeight)
       .setCompactionState(ProtobufUtil.createCompactionStateForRegionLoad(r.getCompactionState()))
-      .setLastMajorCompactionTs(r.getOldestHfileTs(true))
-      .setRegionSizeMB(regionSizeMB).setCurrentRegionPrefetchRatio(currentRegionPrefetchRatio.floatValue());
+      .setLastMajorCompactionTs(r.getOldestHfileTs(true)).setRegionSizeMB(regionSizeMB)
+      .setCurrentRegionCachedRatio(currentRegionCachedRatio.floatValue());
     r.setCompleteSequenceId(regionLoadBldr);
     return regionLoadBldr.build();
   }
