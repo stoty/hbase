@@ -96,16 +96,16 @@ public class ZooKeeperScanPolicyObserver implements RegionCoprocessor, RegionObs
         zk = new ZooKeeper(ensemble, sessionTimeout, this);
         // In a real application, you'd probably want to create these Znodes externally,
         // and not from the coprocessor
-        String createdPath = "";
+        StringBuffer createdPath = new StringBuffer();
         byte[] empty = new byte[0];
         for (String element : NODE.split("/")) {
           if (element.isEmpty()) {
             continue;
           }
           try {
-            createdPath = createdPath + "/" + element;
-            zk.create(createdPath, empty, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-          } catch (NodeExistsException e){
+            createdPath = createdPath.append("/").append(element);
+            zk.create(createdPath.toString(), empty, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+          } catch (NodeExistsException e) {
             // That's OK
           } catch (KeeperException e) {
             throw new IOException(e);
@@ -150,7 +150,7 @@ public class ZooKeeperScanPolicyObserver implements RegionCoprocessor, RegionObs
       return data;
     }
 
-    private void refresh() {
+    private synchronized void refresh() {
       try {
         data = zk.getData(NODE, this, null);
       } catch (KeeperException e) {
@@ -178,8 +178,7 @@ public class ZooKeeperScanPolicyObserver implements RegionCoprocessor, RegionObs
         int sessionTimeout =
           renv.getConfiguration().getInt(ZK_SESSION_TIMEOUT_KEY, ZK_SESSION_TIMEOUT_DEFAULT);
         return new ZKDataHolder(ensemble, sessionTimeout);
-        }
-      ));
+      }));
       cache.open();
     } catch (Exception e) {
       throw new IOException(e);
