@@ -583,6 +583,9 @@ public class HRegionServer extends Thread
   // A timer to shutdown the process if abort takes too long
   private Timer abortMonitor;
 
+  // A timer submit requests to the PrefetchExecutor
+  private PrefetchExecutorNotifier prefetchExecutorNotifier;
+
   /**
    * Starts a HRegionServer at the default location.
    * <p/>
@@ -2160,6 +2163,9 @@ public class HRegionServer extends Thread
     // Compaction thread
     this.compactSplitThread = new CompactSplit(this);
 
+    // Prefetch Notifier
+    this.prefetchExecutorNotifier = new PrefetchExecutorNotifier(conf);
+
     // Background thread to check for compactions; needed if region has not gotten updates
     // in a while. It will take care of not checking too frequently on store-by-store basis.
     this.compactionChecker = new CompactionChecker(this, this.compactionCheckFrequency, this);
@@ -2224,6 +2230,7 @@ public class HRegionServer extends Thread
     // Registering the compactSplitThread object with the ConfigurationManager.
     configurationManager.registerObserver(this.compactSplitThread);
     configurationManager.registerObserver(this.rpcServices);
+    configurationManager.registerObserver(this.prefetchExecutorNotifier);
     configurationManager.registerObserver(this);
   }
 
