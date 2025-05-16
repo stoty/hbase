@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.GeneralSecurityException;
 import java.security.Security;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
@@ -154,11 +155,14 @@ public class TestNettyTLSIPCFileWatcher {
   public void testReplaceServerKeystore()
     throws IOException, ServiceException, GeneralSecurityException, OperatorCreationException {
     Configuration clientConf = new Configuration(CONF);
-    RpcServer rpcServer = createRpcServer("testRpcServer",
-      Lists.newArrayList(new RpcServer.BlockingServiceAndInterface(SERVICE, null)),
-      new InetSocketAddress("localhost", 0), CONF, new FifoRpcScheduler(CONF, 1));
 
+    RpcServer rpcServer = null;
+    Duration orginalPollDuration = Duration.ofMinutes(1);
     try {
+      orginalPollDuration = X509Util.setFilePollIntervalForTesting(Duration.ofSeconds(1));
+      rpcServer = createRpcServer("testRpcServer",
+        Lists.newArrayList(new RpcServer.BlockingServiceAndInterface(SERVICE, null)),
+        new InetSocketAddress("localhost", 0), CONF, new FifoRpcScheduler(CONF, 1));
       rpcServer.start();
 
       try (AbstractRpcClient<?> client = new NettyRpcClient(clientConf)) {
@@ -175,6 +179,12 @@ public class TestNettyTLSIPCFileWatcher {
       // Replace keystore
       x509TestContext.regenerateStores(keyType, keyType, storeFileType, storeFileType);
 
+      try {
+        Thread.sleep(2*1000);
+      } catch (InterruptedException e) {
+        //Do nothing
+      }
+
       try (AbstractRpcClient<?> client = new NettyRpcClient(clientConf)) {
         TestRpcServiceProtos.TestProtobufRpcProto.BlockingInterface stub =
           newBlockingStub(client, rpcServer.getListenerAddress());
@@ -187,7 +197,10 @@ public class TestNettyTLSIPCFileWatcher {
       }
 
     } finally {
-      rpcServer.stop();
+      X509Util.setFilePollIntervalForTesting(orginalPollDuration);
+      if (rpcServer != null) {
+        rpcServer.stop();
+      }
     }
   }
 
@@ -195,11 +208,14 @@ public class TestNettyTLSIPCFileWatcher {
   public void testReplaceClientAndServerKeystore()
     throws GeneralSecurityException, IOException, OperatorCreationException, ServiceException {
     Configuration clientConf = new Configuration(CONF);
-    RpcServer rpcServer = createRpcServer("testRpcServer",
-      Lists.newArrayList(new RpcServer.BlockingServiceAndInterface(SERVICE, null)),
-      new InetSocketAddress("localhost", 0), CONF, new FifoRpcScheduler(CONF, 1));
 
+    RpcServer rpcServer = null;
+    Duration orginalPollDuration = Duration.ofMinutes(1);
     try {
+      orginalPollDuration = X509Util.setFilePollIntervalForTesting(Duration.ofSeconds(1));
+      rpcServer = createRpcServer("testRpcServer",
+        Lists.newArrayList(new RpcServer.BlockingServiceAndInterface(SERVICE, null)),
+        new InetSocketAddress("localhost", 0), CONF, new FifoRpcScheduler(CONF, 1));
       rpcServer.start();
 
       try (AbstractRpcClient<?> client = new NettyRpcClient(clientConf)) {
@@ -217,12 +233,19 @@ public class TestNettyTLSIPCFileWatcher {
         client.cancelConnections(
           ServerName.valueOf(Address.fromSocketAddress(rpcServer.getListenerAddress()), 0L));
 
+        try {
+          Thread.sleep(2*1000);
+        } catch (InterruptedException e) {
+          //Do nothing
+        }
+
         assertEquals(message,
           stub.echo(pcrc, TestProtos.EchoRequestProto.newBuilder().setMessage(message).build())
             .getMessage());
         assertNull(pcrc.cellScanner());
       }
     } finally {
+      X509Util.setFilePollIntervalForTesting(orginalPollDuration);
       rpcServer.stop();
     }
   }

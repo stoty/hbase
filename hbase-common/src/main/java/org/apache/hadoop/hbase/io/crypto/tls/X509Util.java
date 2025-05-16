@@ -154,7 +154,7 @@ public final class X509Util {
 
   private static final String[] DEFAULT_CIPHERS_OPENSSL = getOpenSslFilteredDefaultCiphers();
 
-  private static final Duration FILE_POLL_INTERVAL = Duration.ofMinutes(1);
+  private static Duration FILE_POLL_INTERVAL = Duration.ofMinutes(1);
 
   /**
    * Not all of our default ciphers are available in OpenSSL. Takes our default cipher lists and
@@ -525,5 +525,11 @@ public final class X509Util {
     LOG.info("Attempting to reset default SSL context after receiving watch event on file {}",
       filePath);
     resetContext.run();
+  }
+
+  public static synchronized Duration setFilePollIntervalForTesting(Duration duration) {
+    Duration original = FILE_POLL_INTERVAL;
+    FILE_POLL_INTERVAL = duration;
+    return original;
   }
 }
