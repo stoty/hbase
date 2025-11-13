@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HBaseServerException;
 import org.apache.hadoop.hbase.HConstants;
@@ -531,7 +532,13 @@ class AsyncScanSingleRegionRpcRetryingCaller {
     if (results.length > 0) {
       scanController = new ScanControllerImpl(
         resp.hasCursor() ? Optional.of(ProtobufUtil.toCursor(resp.getCursor())) : Optional.empty());
-      updateNextStartRowWhenError(results[results.length - 1]);
+      //FIXME quick hack to test Phoenix dummy cell compatibility
+      boolean isDummy = CellUtil.matchingColumn(results[0].listCells().get(0), new byte[0], new byte[0]);
+      if (!isDummy) {
+        updateNextStartRowWhenError(results[results.length - 1]);
+      } else {
+        LOG.error("XXXXX skipped updateNextStartRowWhenError for dummy cell", new Exception());
+      }
       consumer.onNext(results, scanController);
     } else {
       Optional<Cursor> cursor = Optional.empty();
